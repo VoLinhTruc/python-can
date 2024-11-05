@@ -143,7 +143,10 @@ class SerialBus(BusABC):
 
         # Assemble message
         byte_msg = bytearray()
-        byte_msg.append(0xAA)
+        if msg.is_extended_id == True:
+            byte_msg.append(0xEE)
+        else:
+            byte_msg.append(0xAA) 
         byte_msg += timestamp
         byte_msg.append(msg.dlc)
         byte_msg += arbitration_id
@@ -179,7 +182,7 @@ class SerialBus(BusABC):
         """
         try:
             rx_byte = self._ser.read()
-            if rx_byte and ord(rx_byte) == 0xAA:
+            if rx_byte and (ord(rx_byte) == 0xAA or ord(rx_byte) == 0xEE):
                 s = self._ser.read(4)
                 timestamp = struct.unpack("<I", s)[0]
                 dlc = ord(self._ser.read())
@@ -198,12 +201,21 @@ class SerialBus(BusABC):
                 delimiter_byte = ord(self._ser.read())
                 if delimiter_byte == 0xBB:
                     # received message data okay
+                    is_extended = False
+                    if (ord(rx_byte) == 0xEE):
+                        is_extended = True
+                    elif (ord(rx_byte) == 0xAA):
+                        is_extended = False
+                    else:
+                        # do nothing
+                        pass
                     msg = Message(
                         # TODO: We are only guessing that they are milliseconds
                         timestamp=timestamp / 1000,
                         arbitration_id=arbitration_id,
                         dlc=dlc,
                         data=data,
+                        is_extended_id=is_extended
                     )
                     return msg, False
 
